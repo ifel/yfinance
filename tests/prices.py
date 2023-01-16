@@ -261,6 +261,22 @@ class TestPriceHistory(unittest.TestCase):
             print("Weekly data not aligned to Monday")
             raise
 
+    def test_prune_post_intraday(self):
+        # Half-day before USA Thanksgiving. Yahoo normally 
+        # returns an interval starting when regular trading closes, 
+        # even if prepost=False.
+        # If prepost=False, test that yfinance is removing prepost intervals.
+
+        tkr = "AMZN"
+        dat = yf.Ticker(tkr, session=self.session)
+
+        tg_d = "2022-11-25"
+        start_d = "2022-11-01"
+        end_d = "2022-12-01"
+        df = dat.history(start=start_d, end=end_d, interval="1h", prepost=False)
+        tg_last_dt = df.loc[tg_d].index[-1]
+        self.assertTrue(tg_last_dt.time() < _dt.time(13))
+
     def test_weekly_2rows_fix(self):
         tkr = "AMZN"
         start = _dt.date.today() - _dt.timedelta(days=14)

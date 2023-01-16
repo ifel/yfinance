@@ -292,6 +292,31 @@ class TickerBase:
         quotes = utils.fix_Yahoo_dst_issue(quotes, params["interval"])
         quotes = utils.fix_Yahoo_returning_live_separate(quotes, params["interval"], tz_exchange)
 
+        if "tradingPeriods" in self._history_metadata:
+            tps_df = self._history_metadata["tradingPeriods"]
+            intraday = params["interval"][-1] in ("m", 'h')
+            if not prepost and intraday:
+                # Sometimes Yahoo returns post-market data despite not requesting it.
+                # Normally happens on half-day early closes.
+                # Remove if volume=0
+                tps_df["_date"] = tps_df.index.date
+                quotes["_date"] = quotes.index.date
+                idx = quotes.index.copy()
+                quotes = quotes.merge(tps_df, how="left", validate="many_to_one")
+                quotes.index = idx
+                # "end" = end of regular trading hours (including any auction)
+                f_post = quotes.index >= quotes["end"]
+                f_zeroVol = quotes["Volume"].to_numpy()==0
+                f_drop = f_post & f_zeroVol
+                if f_drop.any():
+                    n_drop = _np.sum(f_drop)
+                    n = quotes.shape[0]
+                    quotes_dropped = quotes[f_drop]
+                    if debug:
+                        print(f"Dropping {n_drop}/{n} intervals for falling outside regular trading hours")
+                    quotes = quotes[~f_drop]
+                quotes = quotes.drop(["_date", "start", "end"], axis=1)
+
         # actions
         dividends, splits, capital_gains = utils.parse_actions(data["chart"]["result"][0])
         if not expect_capital_gains:
