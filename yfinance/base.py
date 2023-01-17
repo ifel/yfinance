@@ -309,11 +309,13 @@ class TickerBase:
                 f_zeroVol = quotes["Volume"].to_numpy()==0
                 f_drop = f_post & f_zeroVol
                 if f_drop.any():
-                    n_drop = _np.sum(f_drop)
-                    n = quotes.shape[0]
+                    # When printing report, ignore rows that were already NaNs:
+                    f_na = quotes[["Open","Close"]].isna().all(axis=1)
+                    n_nna = quotes.shape[0] - _np.sum(f_na)
+                    n_drop_nna = _np.sum(f_drop & ~f_na)
                     quotes_dropped = quotes[f_drop]
-                    if debug:
-                        print(f"Dropping {n_drop}/{n} intervals for falling outside regular trading hours")
+                    if debug and n_drop_nna > 0:
+                        print(f"Dropping {n_drop_nna}/{n_nna} intervals for falling outside regular trading hours")
                     quotes = quotes[~f_drop]
                 quotes = quotes.drop(["_date", "start", "end"], axis=1)
 
